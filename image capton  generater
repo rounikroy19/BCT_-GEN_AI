@@ -1,0 +1,178 @@
+import streamlit as st
+import ollama
+from PIL import Image
+import io
+import base64
+
+
+# Page Configuration
+st.set_page_config(
+    page_title="AI Image Caption Generator",
+    page_icon="🖼️",
+    layout="wide"
+)
+
+
+st.title("🖼️ AI Image Caption Generator")
+st.write(
+    "Generate creative and descriptive captions for your images using AI (Powered by Ollama - No API Key Required)"
+)
+
+
+# Sidebar Configuration
+st.sidebar.header("⚙️ Settings")
+
+model = st.sidebar.selectbox(
+    "Select AI Model",
+    ["llava:latest", "llava:7b", "llama2:latest"],
+    help="Choose the vision model for caption generation"
+)
+
+caption_style = st.sidebar.selectbox(
+    "Caption Style",
+    [
+        "Descriptive",
+        "Creative",
+        "Professional",
+        "Poetic",
+        "Technical",
+        "Humorous"
+    ]
+)
+
+caption_length = st.sidebar.selectbox(
+    "Caption Length",
+    [
+        "Short (1 sentence)",
+        "Medium (2-3 sentences)",
+        "Detailed (4-5 sentences)"
+    ]
+)
+
+
+# Main Content Area
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("📸 Upload Image")
+    uploaded_file = st.file_uploader(
+        "Choose an image file",
+        type=["jpg", "jpeg", "png", "bmp", "gif"]
+    )
+    
+    image = None
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        st.image(image, use_column_width=True, caption="Uploaded Image")
+
+
+with col2:
+    st.subheader("📝 Generated Caption")
+    
+    if st.button("🚀 Generate Caption", use_container_width=True):
+        if image is None:
+            st.error("Please upload an image first.")
+        else:
+            # Convert image to base64 for API
+            buffered = io.BytesIO()
+            image.save(buffered, format="PNG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode()
+            
+            # Create prompt based on style and length
+            style_instruction = {
+                "Descriptive": "Provide a clear, detailed description of what you see in the image.",
+                "Creative": "Create a creative and imaginative caption that captures the essence of the image.",
+                "Professional": "Write a professional caption suitable for business or formal use.",
+                "Poetic": "Write a poetic and artistic caption that evokes emotion or beauty.",
+                "Technical": "Provide a technical analysis and description of the image elements.",
+                "Humorous": "Create a funny and humorous caption about the image."
+            }
+            
+            length_instruction = {
+                "Short (1 sentence)": "Keep it to one concise sentence.",
+                "Medium (2-3 sentences)": "Use 2-3 sentences for a balanced description.",
+                "Detailed (4-5 sentences)": "Provide 4-5 sentences with comprehensive details."
+            }
+            
+            prompt = f"""You are an expert image caption writer.
+
+{style_instruction[caption_style]}
+
+{length_instruction[caption_length]}
+
+Analyze the image and write only the caption without any additional text or explanations."""
+
+            with st.spinner("✨ Generating caption..."):
+                try:
+                    response = ollama.chat(
+                        model=model,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": prompt,
+                                "images": [img_base64]
+                            }
+                        ]
+                    )
+                    
+                    caption = response.get("message", {}).get("content", "")
+                    
+                    if caption:
+                        st.success("Caption generated successfully!")
+                        st.markdown(f"""
+                        **Generated Caption:**
+                        
+                        > {caption}
+                        """)
+                        
+                        # Copy button
+                        st.text_area(
+                            "Copy the caption:",
+                            value=caption,
+                            height=100,
+                            disabled=True
+                        )
+                    else:
+                        st.error("Failed to generate caption. Please try again.")
+                
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+                    st.info(
+                        "Make sure Ollama is running with a vision model installed. "
+                        "Run: `ollama pull llava:latest`"
+                    )
+
+
+# Additional Features Section
+st.divider()
+st.subheader("💡 Tips for Better Captions")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("""
+    **Descriptive Style:**
+    - Best for documentation
+    - Captures all details
+    - Technical accuracy
+    """)
+
+with col2:
+    st.markdown("""
+    **Creative Style:**
+    - Engages audience
+    - Tells a story
+    - Memorable content
+    """)
+
+with col3:
+    st.markdown("""
+    **Other Styles:**
+    - Professional for business
+    - Poetic for art/emotion
+    - Technical for analysis
+    - Humorous for fun
+    """)
+
+
+      
